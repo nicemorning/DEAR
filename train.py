@@ -16,6 +16,8 @@ import os
 import random
 import utils
 
+import time
+
 
 def main():
 
@@ -93,9 +95,16 @@ def main():
     D_optimizer = optim.Adam(discriminator.parameters(), lr=args.lr_d, betas=(args.beta1, args.beta2))
 
     # Load model from checkpoint
+    print('resume',args.resume)
+
     if args.resume:
-        ckpt_dir = args.ckpt_dir if args.ckpt_dir != '' else save_dir + args.model_type + str(
-            args.start_epoch - 1) + '.sav'
+    #if True:    
+        #ckpt_dir = args.ckpt_dir if args.ckpt_dir != '' else save_dir + args.model_type + str(
+        #    args.start_epoch - 1) + '.sav'
+
+        ckpt_dir = save_dir + 'model' + str(args.start_epoch - 1) + '.sav'
+
+        print(f"Pretrained on {ckpt_dir}")
         checkpoint = torch.load(ckpt_dir)
         model.load_state_dict(checkpoint['model'])
         discriminator.load_state_dict(checkpoint['discriminator'])
@@ -115,9 +124,17 @@ def main():
 
     # Train
     print('Start training...')
+
+    # Added by Jiang
+    print(f"print_every:{args.print_every}  training_size:{len(train_loader)} batch_size:{args.batch_size} epochs:{args.n_epochs}")
+    #return None
+    
     for i in range(args.start_epoch, args.start_epoch + args.n_epochs):
+        t01 =  time.time()
         train(i, model, discriminator, encoder_optimizer, decoder_optimizer, D_optimizer, train_loader, label_idx,
                   args.print_every, save_dir, prior_optimizer, A_optimizer)
+        print(f"T:{time.time() - t01}")
+
         if i % args.save_model_every == 0:
             torch.save({'model': model.module.state_dict(), 'discriminator': discriminator.module.state_dict()},
                        save_dir + 'model' + str(i) + '.sav')
@@ -126,6 +143,8 @@ def main():
 def train(epoch, model, discriminator, encoder_optimizer, decoder_optimizer, D_optimizer,
               train_loader, label_idx, print_every, save_dir,
               prior_optimizer, A_optimizer):
+    t00 = time.time()
+
     model.train()
     discriminator.train()
 
@@ -228,6 +247,8 @@ def train(epoch, model, discriminator, encoder_optimizer, decoder_optimizer, D_o
 
         # Print out losses
         if batch_idx == 0 or (batch_idx + 1) % print_every == 0:
+            t11 = time.time()
+            print(f"T1:{t11-t00}")
             log = ('Train Epoch: {} ({:.0f}%)\tD loss: {:.4f}, Encoder loss: {:.4f}, Decoder loss: {:.4f}, Sup loss: {:.4f}, '
                    'E_score: {:.4f}, D score: {:.4f}'.format(
                 epoch, 100. * batch_idx / len(train_loader),
@@ -238,6 +259,7 @@ def train(epoch, model, discriminator, encoder_optimizer, decoder_optimizer, D_o
             log_file.flush()
 
         if (epoch == 1 or epoch % args.sample_every_epoch == 0) and batch_idx == len(train_loader) - 1:
+            print("Run Test!")
             test(epoch, batch_idx + 1, model, x[:args.save_n_recons], save_dir)
 
 
